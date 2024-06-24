@@ -1,0 +1,238 @@
+---
+title: "carbonccs"
+author: "Xiaoxia Champon"
+date: "2024-06-22"
+output: html_document
+---
+
+```{r}
+carbon_ccs = read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/carbonccs.csv")
+```
+```{r}
+save(carbon_ccs,file = "carbon_ccs.RData")
+```
+
+
+```{r}
+carbon_ccs$date= as.numeric(as.POSIXct(c(carbon_ccs$Date),"%Y-%m-%d %H:%M:%S",tz="EST"))
+
+```
+
+```{r}
+head(carbon_ccs)
+```
+
+
+```{r}
+colnames(carbon_ccs)
+```
+```{r}
+col_list = c("Date", "Sentiment" , "Country.Code", "Continent.Code", "Author", "Gender", "Impressions", "Emotion", "date")
+carbon_ccs_sub = carbon_ccs[,col_list]
+save(carbon_ccs_sub, file= "carbon_ccs_sub.RData")
+```
+
+```{r}
+load("carbon_ccs_sub.RData")
+```
+
+
+```{r}
+head(carbon_ccs_sub)
+```
+
+
+```{r}
+#character
+carbon_ccs_sub$year = as.character (noquote(format(as.Date(c(carbon_ccs_sub$Date)), "%Y")))
+```
+
+
+```{r}
+head(carbon_ccs_sub)
+```
+
+
+```{r}
+Continent_List = c ("AFRICA", "ANTARCTICA", "ASIA", "EUROPE","NORTH AMERICA", "OCEANIA", "SOUTH AMERICA")
+carbon_ccs_sub_new = carbon_ccs_sub[carbon_ccs_sub$Continent.Code %in% Continent_List ,]
+table_data = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Sentiment,carbon_ccs_sub_new$Continent.Code)))
+```
+
+```{r}
+colnames(table_data) = c ("Year", "Sentiment", "Continent", "Freq")
+table_data=table_data[order(table_data$Year,table_data$Sentiment),]
+table_data
+```
+
+```{r}
+table_data_emotion = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Emotion,carbon_ccs_sub_new$Continent.Code)))
+colnames(table_data_emotion) = c ("Year", "Emotion", "Continent", "Freq")
+table_data_emotion=table_data_emotion[order(table_data_emotion$Year,table_data_emotion$Emotion),]
+```
+
+```{r}
+
+table_data_emotion_nonc = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Emotion)))
+colnames(table_data_emotion_nonc) = c ("Year", "Emotion",  "Freq")
+table_data_emotion_nonc=table_data_emotion_nonc[order(table_data_emotion_nonc$Year,table_data_emotion_nonc$Emotion),]
+
+emotion_list = c("Anger", "Disgust", "Fear", "Joy",  "Sadness", "Surprise")
+table_data_emotion_nonc = table_data_emotion_nonc[table_data_emotion_nonc$Emotion %in% emotion_list,]
+ggplot(table_data_emotion_nonc,
+       aes(x = Year,  alluvium = Emotion,
+           y =  Freq,
+           fill = Emotion, stratum = Emotion)) +
+    geom_alluvium() +
+  geom_stratum()
+```
+
+
+
+```{r}
+library(mgcv)
+library(mgcViz)
+# base_model=gam(Freq~Model+NetType+s(NetParam01)+s(ModelParam01)+s(NetParam01,by=NetType)+s(ModelParam01,by=Model),data=cc_n1000_sub_non_zero)
+base_model=gam(Freq~Year,data=table_data)
+summary(base_model)
+para_baseplot=getViz(base_model)
+print(plot(para_baseplot, allTerms = T), pages = 1)
+
+```
+```{r}
+base_model_e=gam(Freq~Year,data=table_data_emotion)
+summary(base_model_e)
+para_baseplot_e=getViz(base_model_e)
+print(plot(para_baseplot_e, allTerms = T), pages = 1)
+```
+
+
+
+
+```{r}
+base_model_sentiment=gam(Freq~Sentiment,data=table_data)
+summary(base_model_sentiment)
+para_baseplot_sentiment=getViz(base_model_sentiment)
+print(plot(para_baseplot_sentiment, allTerms = T), pages = 1)
+```
+
+
+```{r}
+base_model_emotion=gam(Freq~Emotion,data=table_data_emotion)
+summary(base_model_emotion)
+para_baseplot_emotion=getViz(base_model_emotion)
+print(plot(para_baseplot_emotion, allTerms = T), pages = 1)
+```
+
+
+
+
+```{r}
+base_model_contiment=gam(Freq~Continent,data=table_data)
+summary(base_model_contiment)
+para_baseplot_contiment=getViz(base_model_contiment)
+print(plot(para_baseplot_contiment, allTerms = T), pages = 1)
+```
+
+
+```{r}
+base_model_contiment_e=gam(Freq~Continent,data=table_data_emotion)
+summary(base_model_contiment_e)
+para_baseplot_contiment_e=getViz(base_model_contiment_e)
+print(plot(para_baseplot_contiment_e, allTerms = T), pages = 1)
+```
+
+
+
+
+```{r}
+model_senticonti=gam(Freq~Continent+Sentiment+Year,data=table_data)
+summary(model_senticonti)
+para_contiment=getViz(model_senticonti)
+print(plot(para_contiment, allTerms = T), pages = 1)
+```
+
+```{r}
+model_emotion=gam(Freq~Continent+Emotion+Year,data=table_data_emotion)
+summary(model_emotion)
+para_contiment_e=getViz(model_emotion)
+print(plot(para_contiment_e, allTerms = T), pages = 1)
+```
+
+
+```{r}
+table_data_noc = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Sentiment)))
+colnames(table_data_noc) = c ("Year", "Sentiment",  "Freq")
+table_data_nc=table_data_noc[order(table_data_noc$Year,table_data_noc$Sentiment),]
+table_data_nc
+```
+
+
+```{r}
+#https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html
+
+# data(vaccinations)
+# vaccinations <- transform(vaccinations,
+#                           response = factor(response, rev(levels(response))))
+# ggplot(vaccinations,
+#        aes(x = survey, stratum = response, alluvium = subject,
+#            y = freq,
+#            fill = response, label = response)) +
+#   scale_x_discrete(expand = c(.1, .1)) +
+#   geom_flow() +
+#   geom_stratum(alpha = .5) +
+#   geom_text(stat = "stratum", size = 3) +
+#   theme(legend.position = "none") +
+#   ggtitle("vaccination survey responses at three points in time")
+# 
+# # table_data_new <- transform(table_data,
+# #                           response = factor(Year, rev(levels(Year))))
+table_data_new = table_data
+#table_data_new$Continent = as.integer(as.numeric(table_data_new$Continent))
+ggplot(table_data_nc,
+       aes(x = Year,  alluvium = Sentiment,
+           y =  Freq,
+           fill = Sentiment, stratum = Sentiment)) +
+    geom_alluvium() +
+  geom_stratum()
+  # scale_x_discrete(expand = c(.1, .1)) +
+  # geom_flow() +
+  # geom_stratum(alpha = .5) +
+  # geom_text(stat = "stratum", size = 3) +
+  # theme(legend.position = "none") +
+  # ggtitle("vaccination survey responses at three points in time")
+```
+
+
+```{r}
+library(ggalluvial)
+carbon_ccs_sub_nona = na.omit(carbon_ccs_sub)
+ggplot(carbon_ccs_sub_nona,
+       aes(axis1 = Sentiment,
+           axis2 = Continent.Code,
+           axis3 = year,
+           y = n)) +
+  geom_alluvium(aes(fill = Sentiment)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", 
+            label.strata = TRUE) +
+  scale_x_discrete(limits = c("Sentiment", "Continent", "year"),
+                   expand = c(.1, .1)) +
+  scale_fill_viridis_d() +
+  labs(title = "Emotions Over the Year",
+       subtitle = "stratified by Country, Year",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(plot.title=element_text(hjust=0.5),
+        plot.subtitle=element_text(hjust=0.5))+theme(text = element_text(size = 20))  
+```
+
+
+
+
+
+```{r}
+carbon_ccs_sub$date01= (carbon_ccs_sub$date-min(carbon_ccs_sub$date))/(max(carbon_ccs_sub$date)-min((carbon_ccs_sub$date)))
+```
+
