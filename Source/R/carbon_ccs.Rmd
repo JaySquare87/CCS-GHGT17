@@ -6,7 +6,63 @@ output: html_document
 ---
 
 ```{r}
-carbon_ccs = read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/carbonccs.csv")
+# data <- read.csv("/Users/xzhao17/Desktop/v2/2021_01_01_0000_to_2021_01_22_1410_Twitter_CCS.csv.zip", skip = 6, nrows=10)
+# head(data)
+```
+
+```{r}
+library(zip)
+library(readr)
+
+read_csv.zip <- function(file_path){
+  file_names <- zip_list(file_path)$filename
+  if(length(file_names) == 0){
+    stop(paste(file_path, "this file is empty!"))
+  }
+  csv_name <- file_names[1]
+  con <- unz(file_path, csv_name)
+  data <- read_csv(con, skip = 6)
+  #close(con)
+  return(data)
+}
+
+```
+
+```{r}
+library(dplyr)
+
+folder_dir <- "/Users/xzhao17/Desktop/v2"
+
+read_csv.zip_from_dir <- function(folder_path){
+  all_files <- list.files(folder_path, pattern = ".csv.zip", full.names = TRUE)
+  df_list <- NULL
+  for(csv_zip_file in all_files){
+    df <- read_csv.zip(csv_zip_file)
+    df_list <- rbind(df_list, df)
+  }
+  df_list <- data.frame(df_list)
+  return(df_list)
+}
+
+```
+
+```{r}
+
+carbon_ccs <- read_csv.zip_from_dir(folder_dir)
+dim(carbon_ccs)
+#[1] 1094165     133
+```
+
+
+```{r}
+# data <- read.csv("/Users/xzhao17/Desktop/v2/CCScarbon.csv", skip = 6)
+# data
+```
+
+
+```{r}
+#carbon_ccs = read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/carbonccs.csv")
+#carbon_ccs = df_carbon_css
 ```
 ```{r}
 save(carbon_ccs,file = "carbon_ccs.RData")
@@ -41,6 +97,16 @@ load("carbon_ccs_sub.RData")
 head(carbon_ccs_sub)
 ```
 
+```{r}
+country_type <- read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/EconomyType1.csv")
+```
+
+```{r}
+colnames(country_type)[4] <- "Country.Code"
+head(country_type)
+```
+
+
 
 ```{r}
 #character
@@ -51,6 +117,13 @@ carbon_ccs_sub$year = as.character (noquote(format(as.Date(c(carbon_ccs_sub$Date
 ```{r}
 head(carbon_ccs_sub)
 ```
+
+
+```{r}
+merge(df1, df2, by.x = "df1ColName")
+```
+
+
 
 
 ```{r}
