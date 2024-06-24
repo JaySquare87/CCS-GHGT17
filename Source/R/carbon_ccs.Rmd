@@ -120,10 +120,19 @@ head(carbon_ccs_sub)
 
 
 ```{r}
-merge(df1, df2, by.x = "df1ColName")
+carbon_ccs_sub_label <- merge(carbon_ccs_sub, country_type[,c("Economy_type","Country.Code")], by.x = "Country.Code")
 ```
 
+```{r}
+head(carbon_ccs_sub_label)
+```
 
+```{r}
+table_data_country = data.frame (ftable(table(carbon_ccs_sub_label$year , carbon_ccs_sub_label$Sentiment,carbon_ccs_sub_label$Economy_type)))
+colnames(table_data_country) = c ("Year", "Sentiment", "Economy_type", "Freq")
+table_data_country=table_data_country[order(table_data_country$Year,table_data_country$Sentiment),]
+table_data_country
+```
 
 
 ```{r}
