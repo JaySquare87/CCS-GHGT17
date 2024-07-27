@@ -31,7 +31,8 @@ read_csv.zip <- function(file_path){
 ```{r}
 library(dplyr)
 
-folder_dir <- "/Users/xzhao17/Desktop/v2"
+#folder_dir <- "/Users/xzhao17/Desktop/v2"
+folder_dir <- "/Users/xzhao17/Documents/GitHub/carbonccs/v2"
 
 read_csv.zip_from_dir <- function(folder_path){
   all_files <- list.files(folder_path, pattern = ".csv.zip", full.names = TRUE)
@@ -70,6 +71,7 @@ save(carbon_ccs,file = "carbon_ccs.RData")
 
 
 ```{r}
+load("/Users/xzhao17/Documents/GitHub/carbonccs/carbon_ccs.RData")
 carbon_ccs$date= as.numeric(as.POSIXct(c(carbon_ccs$Date),"%Y-%m-%d %H:%M:%S",tz="EST"))
 
 ```
@@ -92,10 +94,26 @@ save(carbon_ccs_sub, file= "carbon_ccs_sub.RData")
 load("carbon_ccs_sub.RData")
 ```
 
-
+# id for each country, year, type , 
+#response: sentiment, 
+#s = year +type repeated country , link = multinorm
+# does the association betweeen sentiment and type change over the years
 ```{r}
 head(carbon_ccs_sub)
 ```
+
+
+```{r}
+#character
+carbon_ccs_sub$year = as.character (noquote(format(as.Date(c(carbon_ccs_sub$Date)), "%Y")))
+```
+
+
+```{r}
+author_emotion_sentiment <- carbon_ccs_sub[,c("Sentiment" ,"Emotion", "Author", "Country.Code", "year")]
+```
+
+
 
 ```{r}
 country_type <- read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/EconomyType1.csv")
@@ -108,15 +126,14 @@ head(country_type)
 
 
 
-```{r}
-#character
-carbon_ccs_sub$year = as.character (noquote(format(as.Date(c(carbon_ccs_sub$Date)), "%Y")))
-```
-
 
 ```{r}
 head(carbon_ccs_sub)
 ```
+
+
+
+
 
 
 ```{r}
@@ -128,11 +145,289 @@ head(carbon_ccs_sub_label)
 ```
 
 ```{r}
+carbon_ccs_sub_label <- merge(carbon_ccs_sub, country_type[,c("Economy_type","Country.Code")], by.x = "Country.Code")
+```
+
+
+```{r}
+author_emotion_sentiment_label <- na.omit(merge(author_emotion_sentiment, country_type[,c("Economy_type","Country.Code")], by.x = "Country.Code")[,-1])
+```
+
+
+```{r}
+author_emotion_sentiment_label_combine <- author_emotion_sentiment_label 
+author_emotion_sentiment_label_combine$Economy_type[author_emotion_sentiment_label_combine$Economy_type== "Major Developed "] <- "Developed"
+```
+
+
+```{r}
+save(author_emotion_sentiment_label, author_emotion_sentiment_label_combine, file = "author_emotion_sentiment_label.RData" )
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+table(carbon_ccs_sub_label$Economy_type)
+```
+#Developed            Developing Economy in Transition      Major Developed  
+#               103858                 72711                  1240                443048
+
+```{r}
+write.csv(carbon_ccs_sub_label, "carbon_ccs_sub_label.csv")
+```
+
+```{r}
+emotion_combine_three <- carbon_ccs_sub_label
+emotion_combine_three$Economy_type[emotion_combine_three$Economy_type=="Major Developed "]  <- "Developed"
+```
+
+
+```{r}
+write.csv(emotion_combine_three, "emotion_combine_three.csv")
+```
+
+
+
+
+```{r}
+emotion_combine_three <- read.csv("emotion_combine_three.csv")
+```
+
+
+```{r}
+library(multgee)
+GEE_data <- na.omit(carbon_ccs_sub_label[,c("Sentiment", "year", "Economy_type","Emotion","Country.Code")])
+```
+
+```{r}
+# Fit GEE model with interaction term
+gee_model <- nomLORgee(Emotion ~ year+Economy_type, id = Country.Code, data = GEE_data, repeated = year)
+summary(gee_model)
+```
+```{r}
+
+```
+
+
+
+```{r}
+library(multgee)
+data(housing) 
+summary(nomLORgee(y~factor(time)*sec,data=housing,id=id,repeated=time))
+```
+
+
+
+
+```{r}
+# library(geepack)
+# gee_model_type <- geeglm(Sentiment ~ Economy_type, id = Country.Code, data = GEE_data, family = gaussian, corstr = "ar1")
+# summary(gee_model_type)
+```
+
+
+```{r}
+table_data_country_freq = table( carbon_ccs_sub_label$Emotion,carbon_ccs_sub_label$Economy_type)
+#colnames(table_data_country_freq) = c ( "Emotion", "Economy_type", "Freq")
+# table_data_country_freq=table_data_country_freq[order(table_data_country_freq$Emotion),]
+# table_data_country_freq
+table_data_country_freq
+```
+```{r}
+table(emotion_combine_three$Emotion, emotion_combine_three$Economy_type)
+```
+
+
+```{r}
+barrplot(table(emotion_combine_three$Emotion, emotion_combine_three$Economy_type),beeside=TRUE)
+```
+
+
+#test
+```{r}
+emotion_test = data.frame (ftable(table( carbon_ccs_sub_label$Emotion,carbon_ccs_sub_label$Economy_type)))
+colnames(emotion_test) = c ( "Emotion", "Economy_type", "Freq")
+
+```
+
+
+
+
+```{r}
+emotion_test %>% 
+  group_by(Economy_type, Emotion) %>% 
+  summarise(count = sum(Freq)) %>% 
+  summarise(pvalue= chisq.test(count)$p.value)
+```
+```{r}
+emotion_test %>% 
+  group_by( Emotion, Economy_type) %>% 
+  summarise(count = sum(Freq)) %>% 
+  summarise(pvalue= chisq.test(count)$p.value)
+```
+
+
+
+
+
+```{r}
+emotion_test_combined_ = data.frame (ftable(table( emotion_combine_three$Economy_type,emotion_combine_three$Emotion)))
+colnames(emotion_test_combined) = c (  "Economy_type","Emotion", "Freq")
+emotion_test_combined
+
+emotion_test_combined %>% 
+  group_by( Emotion, Economy_type) %>% 
+  summarise(count = sum(Freq)) %>% 
+  summarise(pvalue= chisq.test(count)$p.value)
+```
+
+```{r}
+emotion_test_combined = data.frame (ftable(table( emotion_combine_three$Economy_type,emotion_combine_three$Emotion)))
+colnames(emotion_test_combined) = c (  "Economy_type","Emotion", "Freq")
+emotion_test_combined
+emotion_test_combined %>% 
+  group_by( Emotion, Economy_type) %>% 
+  summarise(count = sum(Freq)) %>% 
+  summarise(pvalue= chisq.test(count)$p.value)
+```
+
+
+
+```{r}
 table_data_country = data.frame (ftable(table(carbon_ccs_sub_label$year , carbon_ccs_sub_label$Sentiment,carbon_ccs_sub_label$Economy_type)))
 colnames(table_data_country) = c ("Year", "Sentiment", "Economy_type", "Freq")
 table_data_country=table_data_country[order(table_data_country$Year,table_data_country$Sentiment),]
 table_data_country
 ```
+```{r}
+write.csv(table_data_country, "table_data_country.csv")
+```
+
+```{r}
+save ( table_data_country, file = "table_data_country.RData")
+```
+
+
+```{r}
+table_data_country_emotion_sas = data.frame (ftable(table(carbon_ccs_sub_label$year , carbon_ccs_sub_label$Emotion,carbon_ccs_sub_label$Economy_type)))
+colnames(table_data_country_emotion_sas) = c ("Year", "Emotion", "Economy_type", "Freq")
+table_data_country_emotion_sas=table_data_country_emotion_sas[order(table_data_country_emotion_sas$Year,table_data_country_emotion_sas$Emotion),]
+table_data_country_emotion_sas
+```
+
+```{r}
+write.csv(table_data_country_emotion_sas, "table_data_country_emotion_sas.csv")
+```
+
+
+
+```{r}
+emotion_GEE = data.frame (ftable(table(GEE_data$year , GEE_data$Emotion,GEE_data$Economy_type)))
+colnames(emotion_GEE) = c ("Year", "Emotion", "Economy_type", "Freq")
+emotion_GEE =emotion_GEE [order(emotion_GEE$Year,emotion_GEE$Economy_type),]
+emotion_GEE
+```
+
+```{r}
+emotion_country_sort <- emotion_country[,-1]
+emotion_country_sort <- emotion_country_sort[order(emotion_country_sort$Year,emotion_country_sort$Economy_type),]
+emotion_country_sort
+```
+```{r}
+save(emotion_country_sort,file = "emotion_country_sort.RData")
+```
+
+
+
+```{r}
+
+table_data_country_emotion_combine = data.frame (ftable(table(emotion_combine_three$year , emotion_combine_three$Emotion,emotion_combine_three$Economy_type)))
+colnames(table_data_country_emotion_combine) = c ("Year", "Emotion", "Economy_type", "Freq")
+table_data_country_emotion_combine=table_data_country_emotion_combine[order(table_data_country_emotion_combine$Year,table_data_country_emotion_combine$Emotion),]
+table_data_country_emotion_combine
+```
+
+
+
+```{r}
+emotion_country <- read.csv("/Users/xzhao17/Documents/GitHub/carbonccs/Source/R/table_data_country_emotion_sas.csv")
+```
+
+
+```{r}
+head(emotion_country )
+```
+
+```{r}
+table(emotion_country$Economy_type)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+
+ggqqplot(emotion_country, "Freq", ggtheme = theme_bw()) +
+  facet_grid(Economy_type ~Emotion , labeller = "label_both")+
+  theme(text = element_text(size = 20))
+```
+
+```{r}
+ggqqplot(table_data_country_emotion_combine, "Freq", ggtheme = theme_bw()) +
+  facet_grid(Economy_type ~Emotion , labeller = "label_both")+
+  theme(text = element_text(size = 20))
+```
+
+
+```{r}
+#table_data_country_sub <- data.frame(table_data_country[,-3])
+table_data_sentiment_nonc = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Sentiment)))
+colnames(table_data_sentiment_nonc) = c ("Year", "Sentiment",  "Freq")
+
+```
+```{r}
+ggplot(table_data_sentiment_nonc,
+       aes(x = Year,  alluvium = Sentiment,
+           y =  Freq,
+           fill = Sentiment, stratum = Sentiment)) +
+    geom_alluvium() +
+  geom_stratum()+
+  theme(text=element_text(size=20))
+```
+```{r}
+ggplot(table_data_sentiment_nonc, aes(x=as.numeric(Year), y=Freq, fill=Sentiment)) + 
+    geom_area()+
+  xlab("Year")+
+  theme(text=element_text(size=20))
+```
+
+
+
+```{r}
+type_list <- unique(emotion_country$Economy_type)
+
+for(i in 1: length(type_list)){
+  print(ggplot(emotion_country[emotion_country$Economy_type==type_list[i],],
+       aes(x = Year,  alluvium = Emotion,
+           y =  Freq,
+           fill = Emotion, stratum = Emotion)) +
+    geom_alluvium() +
+  geom_stratum()+
+  ggtitle(type_list[i])+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20)))
+}
+
+```
+
+
 
 
 ```{r}
@@ -153,6 +448,9 @@ colnames(table_data_emotion) = c ("Year", "Emotion", "Continent", "Freq")
 table_data_emotion=table_data_emotion[order(table_data_emotion$Year,table_data_emotion$Emotion),]
 ```
 
+
+
+
 ```{r}
 
 table_data_emotion_nonc = data.frame (ftable(table(carbon_ccs_sub_new$year , carbon_ccs_sub_new$Emotion)))
@@ -161,13 +459,318 @@ table_data_emotion_nonc=table_data_emotion_nonc[order(table_data_emotion_nonc$Ye
 
 emotion_list = c("Anger", "Disgust", "Fear", "Joy",  "Sadness", "Surprise")
 table_data_emotion_nonc = table_data_emotion_nonc[table_data_emotion_nonc$Emotion %in% emotion_list,]
+```
+```{r}
 ggplot(table_data_emotion_nonc,
        aes(x = Year,  alluvium = Emotion,
            y =  Freq,
            fill = Emotion, stratum = Emotion)) +
     geom_alluvium() +
-  geom_stratum()
+  geom_stratum()+
+  theme(text=element_text(size=20))
 ```
+
+```{r}
+ggplot(table_data_emotion_nonc, aes(x=as.numeric(Year), y=Freq, fill=Emotion)) + 
+    geom_area()+
+  xlab("Year")+
+  theme(text=element_text(size=20))
+```
+
+
+
+```{r}
+# create data
+time <- as.numeric(rep(seq(1,7),each=7))  # x Axis
+value <- runif(49, 10, 100)               # y Axis
+group <- rep(LETTERS[1:7],times=7)        # group, one shape per group
+data <- data.frame(time, value, group)
+
+# stacked area chart
+
+```
+
+```{r}
+ggplot(data, aes(x=time, y=value, fill=group)) + 
+    geom_area()
+```
+
+```{r}
+ggplot(emotion_country, aes(x=Year, y=Freq, fill=Emotion)) +
+    geom_area()+ 
+  ggtitle("Emotions Overtime")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20))
+```
+
+
+
+
+```{r}
+for (i in 1:length(type_list)){
+  print(ggplot(emotion_country[emotion_country$Economy_type==type_list[i],], aes(x=Year, y=Freq, fill=Emotion)) +
+    geom_area()+ 
+  ggtitle(type_list[i])+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20)))
+}
+
+  
+```
+
+
+```{r}
+ggplot(emotion_country_sub, aes(x=Year, y=Freq, fill=Emotion)) +
+    geom_area()+ 
+  ggtitle("Emotions Overtime")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20))
+```
+
+
+
+```{r}
+emotion_country_sub <- emotion_country[ emotion_country$Year !=2024,]
+for (i in 1:length(type_list)){
+  print(ggplot(emotion_country_sub[emotion_country_sub$Economy_type==type_list[i] & emotion_country$Year != 2024,], aes(x=Year, y=Freq, fill=Emotion)) +
+    geom_area()+ 
+  ggtitle(type_list[i])+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20)))+
+    scale_x_continuous(breaks=c(2021,2022, 2023))
+   
+}
+```
+
+
+
+
+#combine major developed
+```{r}
+emotion_country_combine <- emotion_country
+
+emotion_country_combine[emotion_country_combine$Economy_type=="Major Developed ", "Economy_type"] <- "Developed"
+
+type_list_combine <- unique(emotion_country_combine$Economy_type)
+for (i in 1:length(type_list_combine)){
+  print(ggplot(emotion_country_combine[emotion_country_combine$Economy_type==type_list[i],], aes(x=Year, y=Freq, fill=Emotion)) +
+    geom_area()+ 
+  ggtitle(type_list[i])+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text=element_text(size=20)))
+}
+```
+
+
+
+```{r}
+res.aov <- anova_test(data = emotion_country[emotion_country$Economy_type=="Developing",], dv = Freq, wid = Emotion, within = Year)
+get_anova_table(res.aov)
+```
+
+```{r}
+pwc <- emotion_country[emotion_country$Economy_type=="Developing",] %>%
+  pairwise_t_test(
+    Freq ~ Year, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+pwc
+```
+
+```{r}
+bxp <- ggboxplot(emotion_country[emotion_country$Economy_type=="Developing",], x = "Year", y = "Freq", add = "point")
+bxp
+```
+
+
+
+```{r}
+# Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "time")
+bxp + 
+  stat_pvalue_manual(pwc) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+```
+```{r}
+#outliser
+emotion_country[emotion_country$Economy_type=="Developing",] %>%
+  group_by(Year) %>%
+  identify_outliers(Freq)
+```
+```{r}
+#normality
+emotion_country[emotion_country$Economy_type=="Developing",] %>%
+  group_by(Year) %>%
+  shapiro_test(Freq)
+```
+```{r}
+ggqqplot(emotion_country[emotion_country$Economy_type=="Developing",], "Freq", facet.by = "Year")
+```
+
+#by economic type
+```{r}
+bxp <- ggboxplot(
+  emotion_country, x = "Year", y = "Freq",
+  color = "Economy_type", palette = "jco"
+  )
+bxp
+```
+```{r}
+emotion_country %>%
+  group_by(Economy_type, Year) %>%
+  identify_outliers(Freq)
+```
+```{r}
+ggqqplot(emotion_country, "Freq", ggtheme = theme_bw()) +
+  facet_grid(Year ~ Economy_type, labeller = "label_both")
+```
+
+
+```{r}
+ggqqplot(emotion_country, "Freq", ggtheme = theme_bw()) +
+  facet_grid(Year ~ Economy_type, labeller = "label_both")
+```
+
+
+
+```{r}
+ggqqplot(table_data_country_emotion_combine, "Freq", ggtheme = theme_bw()) +
+  facet_grid(Year ~ Economy_type, labeller = "label_both")
+```
+
+
+
+
+
+```{r}
+# Pairwise comparisons between treatment groups
+pwc <- emotion_country %>%
+  group_by(Year) %>%
+  pairwise_t_test(
+    Freq ~ Economy_type, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+pwc
+```
+
+```{r}
+res.aov <- anova_test(
+  data = emotion_country, dv = Freq, wid = Emotion,
+  within = c(Economy_type, Year)
+  )
+get_anova_table(res.aov)
+```
+
+
+
+```{r}
+
+# Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "time")
+bxp + 
+  stat_pvalue_manual(pwc, tip.length = 0, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+```
+
+```{r}
+
+pwc <- table_data_country_emotion_combine %>%
+  group_by(Year) %>%
+  pairwise_t_test(
+    Freq ~ Economy_type, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+bxp <- ggboxplot(
+  table_data_country_emotion_combine, x = "Year", y = "Freq",
+  color = "Economy_type", palette = "jco"
+  )
+res.aov <- anova_test(
+  data = table_data_country_emotion_combine, dv = Freq, wid = Emotion,
+  within = c(Economy_type, Year)
+  )
+# Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "time")
+bxp + 
+  stat_pvalue_manual(pwc, tip.length = 0, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+```
+```{r}
+get_anova_table(res.aov)
+```
+
+#Use GEE data
+```{r}
+GEE_data_sentiment <- GEE_data
+conditions <- c("negative","neutral", "positive")
+replacement_values <- c(-1,0,1)
+
+replace_all <- function(old_vector, old_values, new_values){
+    c(new_values, old_vector)[match(old_vector, c(old_values, old_vector))]
+}
+
+GEE_data_sentiment$Sentiment.Ordinal <- replace_all(GEE_data_sentiment$Sentiment, conditions, replacement_values)
+
+```
+
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+pwc <- GEE_data_sentiment %>%
+  group_by(year) %>%
+  pairwise_t_test(
+    Sentiment.Ordinal ~ Economy_type, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+bxp <- ggboxplot(
+  GEE_data_sentiment, x = "year", y = "Sentiment.Ordinal",
+  color = "Economy_type", palette = "jco"
+  )
+res.aov <- anova_test(
+  data = GEE_data_sentiment, dv = Sentiment.Ordinal, wid = Emotion,
+  within = c(Economy_type, year)
+  )
+# Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "time")
+bxp + 
+  stat_pvalue_manual(pwc, tip.length = 0, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+get_anova_table(res.aov)
+```
+
+
+
+
+
+```{r}
+# Fit a quasibinomial model
+glm_model <- glm(Freq ~ Economy_type + Emotion + Year, 
+            family = multinomial(), data = emotion_country)
+```
+
+```{r}
+library(nnet)
+fit_basic <- multinom(Freq ~ Emotion + Economy_type + Year, data = emotion_country)
+```
+
+```{r}
+summary(fit_basic)
+```
+
+
 
 
 
@@ -175,14 +778,14 @@ ggplot(table_data_emotion_nonc,
 library(mgcv)
 library(mgcViz)
 # base_model=gam(Freq~Model+NetType+s(NetParam01)+s(ModelParam01)+s(NetParam01,by=NetType)+s(ModelParam01,by=Model),data=cc_n1000_sub_non_zero)
-base_model=gam(Freq~Year,data=table_data)
+base_model=gam(Freq~Year,data=table_data_country)
 summary(base_model)
 para_baseplot=getViz(base_model)
 print(plot(para_baseplot, allTerms = T), pages = 1)
 
 ```
 ```{r}
-base_model_e=gam(Freq~Year,data=table_data_emotion)
+base_model_e=gam(Freq~Year,data=table_data_country_emotion_sas)
 summary(base_model_e)
 para_baseplot_e=getViz(base_model_e)
 print(plot(para_baseplot_e, allTerms = T), pages = 1)
@@ -192,7 +795,7 @@ print(plot(para_baseplot_e, allTerms = T), pages = 1)
 
 
 ```{r}
-base_model_sentiment=gam(Freq~Sentiment,data=table_data)
+base_model_sentiment=gam(Freq~Sentiment,data=table_data_country)
 summary(base_model_sentiment)
 para_baseplot_sentiment=getViz(base_model_sentiment)
 print(plot(para_baseplot_sentiment, allTerms = T), pages = 1)
@@ -200,7 +803,7 @@ print(plot(para_baseplot_sentiment, allTerms = T), pages = 1)
 
 
 ```{r}
-base_model_emotion=gam(Freq~Emotion,data=table_data_emotion)
+base_model_emotion=gam(Freq~Emotion,data=table_data_country_emotion_sas)
 summary(base_model_emotion)
 para_baseplot_emotion=getViz(base_model_emotion)
 print(plot(para_baseplot_emotion, allTerms = T), pages = 1)
@@ -210,7 +813,7 @@ print(plot(para_baseplot_emotion, allTerms = T), pages = 1)
 
 
 ```{r}
-base_model_contiment=gam(Freq~Continent,data=table_data)
+base_model_contiment=gam(Freq~Economy_type,data=table_data_country)
 summary(base_model_contiment)
 para_baseplot_contiment=getViz(base_model_contiment)
 print(plot(para_baseplot_contiment, allTerms = T), pages = 1)
@@ -218,7 +821,7 @@ print(plot(para_baseplot_contiment, allTerms = T), pages = 1)
 
 
 ```{r}
-base_model_contiment_e=gam(Freq~Continent,data=table_data_emotion)
+base_model_contiment_e=gam(Freq~Economy_type,data=table_data_country_emotion_sas)
 summary(base_model_contiment_e)
 para_baseplot_contiment_e=getViz(base_model_contiment_e)
 print(plot(para_baseplot_contiment_e, allTerms = T), pages = 1)
@@ -228,18 +831,78 @@ print(plot(para_baseplot_contiment_e, allTerms = T), pages = 1)
 
 
 ```{r}
-model_senticonti=gam(Freq~Continent+Sentiment+Year,data=table_data)
+model_senticonti=gam(Freq~Economy_type+Sentiment+Year,data=table_data_country)
 summary(model_senticonti)
 para_contiment=getViz(model_senticonti)
 print(plot(para_contiment, allTerms = T), pages = 1)
 ```
 
 ```{r}
-model_emotion=gam(Freq~Continent+Emotion+Year,data=table_data_emotion)
+model_senticonti1=gam(Freq~Economy_type+Sentiment+Year,data=table_data_country[table_data_country$Year!=2024,])
+summary(model_senticonti1)
+para_contiment1=getViz(model_senticonti1)
+print(plot(para_contiment1, allTerms = T), pages = 1)
+```
+
+
+
+
+```{r}
+model_emotion=gam(Freq~Economy_type+Emotion+Year,data=table_data_country_emotion_sas)
 summary(model_emotion)
 para_contiment_e=getViz(model_emotion)
 print(plot(para_contiment_e, allTerms = T), pages = 1)
 ```
+
+
+```{r}
+model_emotion1=gam(Freq~Economy_type+Emotion+Year,data=table_data_country_emotion_sas[table_data_country_emotion_sas$Year!=2024,])
+summary(model_emotion1)
+para_contiment_e1=getViz(model_emotion1)
+print(plot(para_contiment_e1, allTerms = T), pages = 1)
+```
+
+
+
+```{r}
+model_emotion_lm=lm(Freq~Economy_type+Emotion+Year+Economy_type*Year,data=table_data_country_emotion_sas)
+summary(model_emotion_lm)
+```
+```{r}
+model_emotion_lm1=lm(Freq~Economy_type+Emotion+Year+Economy_type*Year,data=table_data_country_emotion_sas[table_data_country_emotion_sas$Year!=2024,])
+summary(model_emotion_lm1)
+```
+
+```{r}
+model_emotion_lm2=lm(Freq~Economy_type+Emotion+Year+Economy_type*Emotion,data=table_data_country_emotion_sas[table_data_country_emotion_sas$Year!=2024,])
+summary(model_emotion_lm2)
+```
+
+```{r}
+new_data = table_data_country_emotion_sas[table_data_country_emotion_sas$Year!=2024,]
+new_data$Economy_type[new_data$Economy_type=="Major Developed"]  <- "Developed"
+
+
+model_emotion_lm3=lm(Freq~Economy_type+Emotion+Year+Economy_type*Emotion,data=table_data_country_emotion_sas[table_data_country_emotion_sas$Year!=2024,])
+summary(model_emotion_lm3)
+```
+
+
+```{r}
+model_sentiment_lm=lm(Freq~Economy_type+Sentiment+Year+Economy_type*Year,data=table_data_country)
+summary(model_sentiment_lm)
+```
+
+```{r}
+model_sentiment_lm1=lm(Freq~Economy_type+Sentiment+Year+Economy_type*Year,data=table_data_country[table_data_country$Year!=2024,])
+summary(model_sentiment_lm1)
+```
+
+```{r}
+model_sentiment_lm2=lm(Freq~Economy_type+Sentiment+Year+Economy_type*Sentiment,data=table_data_country[table_data_country$Year!=2024,])
+summary(model_sentiment_lm2)
+```
+
 
 
 ```{r}
